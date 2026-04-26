@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutoriel Complet : Agent ReAct avec Mémoire & Human-in-the-Loop</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/white.css">
+  <style>
+    .reveal { font-size: 22px; color: #333; }
+    .reveal h1 { color: #2c3e50; font-size: 2.2em; }
+    .reveal h2 { color: #34495e; font-size: 1.6em; margin-bottom: 30px; }
+    .reveal h3 { color: #7f8c8d; font-size: 1.2em; }
+    .reveal p, .reveal li { line-height: 1.8; color: #555; }
+    .reveal pre { background: #2c3e50; padding: 20px; border-radius: 8px; font-size: 0.75em; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .reveal code { font-family: 'Consolas', 'Fira Code', monospace; color: #3498db; }
+    .reveal strong { color: #2c3e50; }
+    
+    /* Diagrams & Schemas */
+    .diagram-container { margin: 25px 0; padding: 20px; background: #f8f9fa; border-radius: 10px; border-left: 5px solid #3498db; }
+    .flow-diagram { display: flex; align-items: center; justify-content: center; gap: 15px; margin: 20px 0; flex-wrap: wrap; }
+    .flow-box { background: white; border: 3px solid #3498db; padding: 15px 20px; border-radius: 10px; text-align: center; min-width: 120px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); position: relative; }
+    .flow-box.primary { background: #3498db; color: white; border-color: #2980b9; }
+    .flow-box.secondary { background: #2ecc71; color: white; border-color: #27ae60; }
+    .flow-box.warning { background: #e74c3c; color: white; border-color: #c0392b; }
+    .flow-box.info { background: #9b59b6; color: white; border-color: #8e44ad; }
+    .flow-arrow { color: #7f8c8d; font-size: 1.8em; font-weight: bold; }
+    .flow-label { font-size: 0.7em; color: #FFFFFF; margin-top: 5px; }
+    
+    /* Architecture boxes */
+    .arch-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin: 20px 0; }
+    .arch-box { background: white; border: 2px solid #bdc3c7; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+    .arch-box h4 { color: #2c3e50; margin-top: 0; border-bottom: 2px solid #3498db; padding-bottom: 10px; }
+    
+    /* Memory visualization */
+    .memory-stack { display: flex; flex-direction: column; gap: 10px; max-width: 400px; margin: 20px auto; }
+    .memory-layer { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 15px; border-radius: 8px; text-align: center; position: relative; }
+    .memory-layer.short-term { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+    .memory-layer.long-term { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); }
+    .memory-layer::before { content: "📦"; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); }
+    
+    /* Cycle diagram */
+    .cycle-container { position: relative; width: 500px; height: 500px; margin: 20px auto; }
+    .cycle-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #2c3e50; color: white; width: 120px; height: 120px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; z-index: 10; box-shadow: 0 4px 15px rgba(0,0,0,0.3); }
+    .cycle-step { position: absolute; width: 140px; height: 80px; background: white; border: 3px solid #3498db; border-radius: 10px; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10px; box-shadow: 0 3px 10px rgba(0,0,0,0.15); font-weight: bold; }
+    .cycle-step:nth-child(1) { top: 20px; left: 180px; background: #3498db; color: white; }
+    .cycle-step:nth-child(2) { top: 130px; right: 20px; background: #2ecc71; color: white; }
+    .cycle-step:nth-child(3) { bottom: 130px; right: 20px; background: #e74c3c; color: white; }
+    .cycle-step:nth-child(4) { bottom: 20px; left: 180px; background: #9b59b6; color: white; }
+    .cycle-arrow { position: absolute; font-size: 2em; color: #7f8c8d; }
+    
+    /* Interactive buttons */
+    .toggle-btn { background: #3498db; color: white; border: none; padding: 12px 24px; border-radius: 6px; cursor: pointer; margin: 15px 0; transition: all 0.3s; font-size: 0.9em; }
+    .toggle-btn:hover { background: #2980b9; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+    .hidden-content { display: none; margin-top: 15px; padding: 20px; background: #ecf0f1; border-radius: 8px; border-left: 5px solid #3498db; text-align: left; }
+    
+    /* Quiz styles */
+    .quiz-container { background: #f8f9fa; padding: 25px; border-radius: 10px; margin: 20px 0; border: 2px solid #bdc3c7; }
+    .quiz-btn { background: white; color: #2c3e50; border: 2px solid #3498db; padding: 12px; margin: 8px 0; cursor: pointer; text-align: left; width: 100%; border-radius: 6px; transition: all 0.2s; }
+    .quiz-btn:hover { background: #3498db; color: white; }
+    .feedback { margin-top: 15px; padding: 15px; border-radius: 6px; font-weight: bold; display: none; }
+    .feedback.show { display: block; }
+    .feedback.correct { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+    .feedback.incorrect { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+    
+    /* Code annotations */
+    .code-annotation { background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0; font-size: 0.9em; }
+    
+    /* Human in the loop visualization */
+    .hitl-diagram { display: flex; align-items: center; justify-content: space-around; margin: 30px 0; padding: 20px; background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .hitl-box { text-align: center; padding: 20px; border-radius: 8px; min-width: 150px; }
+    .hitl-box.ai { background: #e3f2fd; border: 2px solid #2196f3; }
+    .hitl-box.human { background: #fff3e0; border: 2px solid #ff9800; }
+    .hitl-box.decision { background: #f3e5f5; border: 2px solid #9c27b0; }
+    .hitl-arrow { font-size: 2em; color: #7f8c8d; }
+    
+    /* Comparison table */
+    .comparison-table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+    .comparison-table th, .comparison-table td { border: 1px solid #bdc3c7; padding: 12px; text-align: left; }
+    .comparison-table th { background: #34495e; color: white; }
+    .comparison-table tr:nth-child(even) { background: #f8f9fa; }
+    
+    /* Icons */
+    .icon { font-size: 1.5em; margin-right: 8px; vertical-align: middle; }
+    
+    ul { text-align: left; margin-left: 30px; }
+    .reveal ul li { margin-bottom: 10px; }
+    
+    /* Responsive */
+    @media (max-width: 768px) {
+      .flow-diagram { flex-direction: column; }
+      .arch-grid { grid-template-columns: 1fr; }
+      .cycle-container { width: 300px; height: 300px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Title -->
+      <section>
+        <h1>Construction d'un agent ReAct</h1>
+        <h3>Architecture Complète avec Mémoire, Contexte & Human-in-the-Loop</h3>
+        <div style="margin-top: 40px; padding: 20px; background: #ecf0f1; border-radius: 10px; display: inline-block;">
+          <p style="margin: 0; color: #7f8c8d; font-size: 0.9em;"> Auteur: Mélèdje Laroche</p>
+          <p style="margin: 10px 0 0 0; color: #95a5a6; font-size: 0.8em;">Navigation: ← → ou Espace</p>
+        </div>
+      </section>
+
+      <!-- Slide 2: What is ReAct -->
+      <section>
+        <h2>🧠 Qu'est-ce que ReAct ?</h2>
+        <div class="diagram-container">
+          <p><strong>ReAct = Reasoning + Acting</strong></p>
+          <p>Un paradigme où l'IA alterne entre <strong>réflexion</strong> (pensée structurée) et <strong>action</strong> (utilisation d'outils) pour résoudre des tâches complexes.</p>
+        </div>
+        
+        <div class="flow-diagram">
+          <div class="flow-box primary">
+            💭 Thought<br>
+            <span class="flow-label">Raisonnement</span>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box secondary">
+            🔧 Action<br>
+            <span class="flow-label">Exécution</span>
+          </div>
+          <div class="flow-arrow">→</div>
+          <div class="flow-box info">
+            👁️ Observation<br>
+            <span class="flow-label">Résultat</span>
+          </div>
+        </div>
+        
+        <button class="toggle-btn" data-target="#react-why">💡 Pourquoi ReAct plutôt qu'un LLM simple ?</button>
+        <div id="react-why" class="hidden-content">
+          <ul>
+            <li><strong>Transparence</strong> : On voit le raisonnement étape par étape</li>
+            <li><strong>Correction d'erreurs</strong> : L'agent peut se rendre compte de ses erreurs et ajuster</li>
+            <li><strong>Accès aux outils</strong> : Connexion à des APIs, bases de données, calculatrices</li>
+            <li><strong>Moins d'hallucinations</strong> : Basé sur des faits observés, pas juste sur l'entraînement</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Slide 3: Architecture Overview -->
+      <section>
+        <h2>🏗️ Architecture Complète de l'Agent</h2>
+        <div class="arch-grid">
+          <div class="arch-box">
+            <h4>🧠 Cerveau (LLM)</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Chain of Thought (CoT)</li>
+              <li>Prise de décision</li>
+              <li>Génération de réponses</li>
+              <li>Évaluation de confiance</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h4>📚 Mémoire</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Court terme (conversation)</li>
+              <li>Long terme (vector DB)</li>
+              <li>Historique des actions</li>
+              <li>Préférences utilisateur</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h4>🔍 Contexte (RAG)</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Base de connaissances</li>
+              <li>Documents pertinents</li>
+              <li>Embeddings vectoriels</li>
+              <li>Mise à jour temps réel</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h4>🛠️ Outils & Humain</h4>
+            <ul style="font-size: 0.85em;">
+              <li>APIs externes</li>
+              <li>Calcul/code</li>
+              <li>Human-in-the-loop</li>
+              <li>Validation humaine</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 4: Chain of Thought Deep Dive -->
+      <section>
+        <h2>🔗 Chain of Thought (CoT) Détaillé</h2>
+        <p>Le CoT force le modèle à décomposer son raisonnement de manière explicite :</p>
+        
+        <div class="diagram-container" style="background: #fff; border: 2px solid #3498db;">
+          <pre><code>Question: "Quel est le meilleur restaurant italien près de moi 
+          qui accepte les cartes de crédit et a une note > 4.5?"
+
+Thought 1: Je dois d'abord trouver ma localisation actuelle
+Action: get_user_location()
+Observation: "Paris, 11ème arrondissement"
+
+Thought 2: Maintenant je cherche les restaurants italiens dans cette zone
+Action: search_restaurants(cuisine="italian", location="Paris 11")
+Observation: [Liste de 5 restaurants]
+
+Thought 3: Je dois filtrer ceux qui acceptent les cartes et ont note > 4.5
+Thought 4: Le restaurant "Luigi's" correspond: note 4.7, accepte CB
+Final Answer: "Luigi's, 4.7★, 123 rue de la Roquette"</code></pre>
+        </div>
+        
+        <div class="code-annotation">
+          <strong>💡 Astuce :</strong> Ajoutez "Pense étape par étape" dans votre prompt pour activer le CoT automatiquement.
+        </div>
+      </section>
+
+      <!-- Slide 5: Memory System -->
+      <section>
+        <h2>🧠 Système de Mémoire Hiérarchique</h2>
+        
+        <div class="memory-stack">
+          <div class="memory-layer short-term">
+            <strong>Mémoire Court Terme</strong><br>
+            <small>• Contexte de la conversation actuelle<br>
+            • Historique des 10-20 derniers messages<br>
+            • Variables temporaires<br>
+            • État actuel de la tâche</small>
+          </div>
+          <div class="memory-layer long-term">
+            <strong>Mémoire Long Terme</strong><br>
+            <small>• Base vectorielle (FAISS/Chroma/Pinecone)<br>
+            • Faits importants sur l'utilisateur<br>
+            • Résultats de tâches précédentes<br>
+            • Connaissances métier persistantes</small>
+          </div>
+        </div>
+        
+        <div class="flow-diagram" style="margin-top: 0px;">
+          <div class="flow-box" style="background: #f39c12; color: white;">
+            📝 Écriture<br>
+            <small>Nouvelles infos</small>
+          </div>
+          <div class="flow-arrow">↔️</div>
+          <div class="flow-box primary">
+            🔄 Mémoire<br>
+            <small>Active</small>
+          </div>
+          <div class="flow-arrow">↔️</div>
+          <div class="flow-box" style="background: #16a085; color: white;">
+            🔍 Lecture<br>
+            <small>Recherche sémantique</small>
+          </div>
+        </div>
+        
+        <button class="toggle-btn" data-target="#memory-code">💻 Exemple de code Mémoire</button>
+        <div id="memory-code" class="hidden-content">
+          <pre><code>from langchain.memory import ConversationBufferMemory, VectorStoreRetrieverMemory
+
+# Mémoire court terme
+short_term = ConversationBufferMemory(
+    memory_key="chat_history",
+    return_messages=True,
+    max_token_limit=2000
+)
+
+# Mémoire long terme (vectorielle)
+long_term = VectorStoreRetrieverMemory(
+    retriever=vector_store.as_retriever(k=5)
+)
+
+# À chaque tour de conversation:
+context = short_term.load_memory_variables({})
+relevant_facts = long_term.load_memory_variables({"query": user_input})</code></pre>
+        </div>
+      </section>
+
+      <!-- Slide 6: RAG & Context -->
+      <section>
+        <h2>📚 RAG (Retrieval-Augmented Generation)</h2>
+        <p>Le RAG permet d'enrichir le contexte avec des informations externes à jour :</p>
+        
+        <div style="display: flex; align-items: center; justify-content: center; margin: 30px 0;">
+          <div style="flex: 1; text-align: center; padding: 20px;">
+            <div style="background: #3498db; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+              📄 Documents Sources
+            </div>
+            <small>PDF, Web, DB</small>
+          </div>
+          <div style="font-size: 2em; color: #7f8c8d;">→</div>
+          <div style="flex: 1; text-align: center; padding: 20px;">
+            <div style="background: #9b59b6; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+              🔢 Embeddings
+            </div>
+            <small>Vectorisation</small>
+          </div>
+          <div style="font-size: 2em; color: #7f8c8d;">→</div>
+          <div style="flex: 1; text-align: center; padding: 20px;">
+            <div style="background: #e74c3c; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+              🗄️ Vector Store
+            </div>
+            <small>FAISS/Chroma</small>
+          </div>
+          <div style="font-size: 2em; color: #7f8c8d;">→</div>
+          <div style="flex: 1; text-align: center; padding: 20px;">
+            <div style="background: #2ecc71; color: white; padding: 15px; border-radius: 8px; margin-bottom: 10px;">
+              🎯 Contexte
+            </div>
+            <small>Top-K pertinent</small>
+          </div>
+        </div>
+        
+        <div class="diagram-container">
+          <h4 style="margin-top: 0; color: #2c3e50;"> Stratégies de Retrieval</h4>
+          <table class="comparison-table" style="font-size: 0.85em;">
+            <tr>
+              <th>Méthode</th>
+              <th>Usage</th>
+              <th>Avantage</th>
+            </tr>
+            <tr>
+              <td><strong>Sparse (BM25)</strong></td>
+              <td>Mots-clés exacts</td>
+              <td>Rapide, précis pour termes techniques</td>
+            </tr>
+            <tr>
+              <td><strong>Dense (Embeddings)</strong></td>
+              <td>Sémantique</td>
+              <td>Comprend le sens, synonymes</td>
+            </tr>
+            <tr>
+              <td><strong>Hybride</strong></td>
+              <td>Les deux combinés</td>
+              <td>Meilleur des deux mondes ⭐</td>
+            </tr>
+          </table>
+        </div>
+      </section>
+
+      <!-- Slide 7: Tools & Actions -->
+      <section>
+        <h2>🛠️ Système d'Outils (Tools)</h2>
+        <p>Chaque outil est une fonction que l'agent peut appeler dynamiquement :</p>
+        
+        <div class="arch-grid">
+          <div class="arch-box" style="border-color: #3498db;">
+            <h4 style="color: #3498db;">🔍 Outils de Recherche</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Recherche web (Google, Bing)</li>
+              <li>Recherche dans base interne</li>
+              <li>Wikipedia/APIs métier</li>
+            </ul>
+          </div>
+          <div class="arch-box" style="border-color: #2ecc71;">
+            <h4 style="color: #27ae60;"> Outils de Calcul</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Python REPL (code exécution)</li>
+              <li>Calculatrice mathématique</li>
+              <li>Analyse de données</li>
+            </ul>
+          </div>
+          <div class="arch-box" style="border-color: #e74c3c;">
+            <h4 style="color: #c0392b;">📡 Outils d'Action</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Envoi d'emails</li>
+              <li>Création de tickets</li>
+              <li>Mise à jour BDD</li>
+            </ul>
+          </div>
+          <div class="arch-box" style="border-color: #f39c12;">
+            <h4 style="color: #d35400;">👤 Outils Utilisateur</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Demande de clarification</li>
+              <li>Confirmation d'action</li>
+              <li>Préférences utilisateur</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="code-annotation">
+          <strong>⚠️ Important :</strong> Chaque outil doit avoir une description claire pour que le LLM sache quand l'utiliser.
+        </div>
+      </section>
+
+      <!-- Slide 8: Complete ReAct Cycle -->
+      <section>
+        <h2>🔄 Le Cycle ReAct Complet</h2>
+        
+        <div class="cycle-container">
+          <div class="cycle-center">AGENT<br>CORE</div>
+          <div class="cycle-step">1️⃣ Question<br>+ Contexte</div>
+          <div class="cycle-step">2️⃣ Thought<br>(CoT)</div>
+          <div class="cycle-step">3️⃣ Action<br>(Tool)</div>
+          <div class="cycle-step">4️⃣ Observation<br>+ Mémoire</div>
+          <div class="cycle-arrow" style="top: 100px; left: 330px;">↻</div>
+          <div class="cycle-arrow" style="top: 260px; right: 100px;">↻</div>
+          <div class="cycle-arrow" style="bottom: 100px; left: 160px;">↻</div>
+          <div class="cycle-arrow" style="top: 260px; left: 100px;">↻</div>
+        </div>
+        
+        <div class="diagram-container" style="margin-top: 30px;">
+          <h4 style="margin-top: 0;">📋 Pseudo-code du Cycle</h4>
+          <pre><code>def agent_loop(user_input, max_iterations=10):
+    context = retrieve_relevant_docs(user_input)
+    memory = load_conversation_history()
+    
+    for i in range(max_iterations):
+        # Étape 1: Réflexion
+        prompt = build_prompt(user_input, context, memory)
+        llm_output = llm.generate(prompt)
+        
+        thought, action, action_input = parse_react_output(llm_output)
+        memory.add_thought(thought)
+        
+        # Étape 2: Vérification humaine si nécessaire
+        if requires_human_approval(action):
+            if not human_approval(action, action_input):
+                continue  # L'agent doit trouver une autre solution
+        
+        # Étape 3: Exécution
+        observation = execute_tool(action, action_input)
+        memory.add_observation(observation)
+        
+        # Étape 4: Vérification de la réponse finale
+        if is_final_answer(thought):
+            # Évaluation humaine optionnelle
+            if requires_human_validation(thought):
+                final_answer = human_review(thought)
+            else:
+                final_answer = thought
+            
+            save_to_long_term_memory(user_input, final_answer)
+            return final_answer
+    
+    raise Exception("Max iterations reached")</code></pre>
+        </div>
+      </section>
+
+      <!-- Slide 9: Human-in-the-Loop -->
+      <section>
+        <h2>👤 Human-in-the-Loop (HITL)</h2>
+        <p>L'humain intervient aux points critiques pour valider, corriger ou guider l'agent :</p>
+        
+        <div class="hitl-diagram">
+          <div class="hitl-box ai">
+            <div style="font-size: 2em;">🤖</div>
+            <strong>Agent IA</strong><br>
+            <small>Propose une action</small>
+          </div>
+          <div class="hitl-arrow">→</div>
+          <div class="hitl-box decision">
+            <div style="font-size: 2em;">⚖️</div>
+            <strong>Point de<br>Décision</strong><br>
+            <small>Risque élevé?</small>
+          </div>
+          <div class="hitl-arrow">→</div>
+          <div class="hitl-box human">
+            <div style="font-size: 2em;">👤</div>
+            <strong>Humain</strong><br>
+            <small>Valide/Corrige/Refuse</small>
+          </div>
+        </div>
+        
+        <div class="arch-grid" style="margin-top: 30px;">
+          <div class="arch-box">
+            <h4>🚦 Quand activer le HITL ?</h4>
+            <ul style="font-size: 0.85em;">
+              <li><strong>Confiance basse</strong> : Score < 0.7</li>
+              <li><strong>Actions irréversibles</strong> : Suppression, envoi d'argent</li>
+              <li><strong>Données sensibles</strong> : Santé, juridique, financier</li>
+              <li><strong>Ambiguïté</strong> : Plusieurs interprétations possibles</li>
+              <li><strong>Nouveauté</strong> : Cas jamais vu auparavant</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h4>💡 Modes d'intervention</h4>
+            <ul style="font-size: 0.85em;">
+              <li><strong>Approval</strong> : "Peux-tu confirmer cette action ?"</li>
+              <li><strong>Correction</strong> : L'humain modifie la proposition</li>
+              <li><strong>Guidance</strong> : "Essaie plutôt cette approche..."</li>
+              <li><strong>Escalade</strong> : Transfert à un expert humain</li>
+            </ul>
+          </div>
+        </div>
+        
+        <button class="toggle-btn" data-target="#hitl-example">📝 Exemple concret HITL</button>
+        <div id="hitl-example" class="hidden-content">
+          <pre><code># Configuration des règles HITL
+HITL_RULES = {
+    "financial_transaction": {
+        "threshold": 1000,  # Euros
+        "require_approval": True,
+        "escalate_if": "amount > 10000"
+    },
+    "medical_advice": {
+        "always_require_human": True,
+        "disclaimer": "Ceci ne remplace pas un avis médical"
+    },
+    "data_deletion": {
+        "require_confirmation": True,
+        "cooling_period": "24h"  # Délai de rétractation
+    }
+}
+
+def check_hitl_required(action, context):
+    if action.type in HITL_RULES:
+        rule = HITL_RULES[action.type]
+        if rule.get("always_require_human"):
+            return True
+        if action.amount > rule.get("threshold", float('inf')):
+            return True
+    return False</code></pre>
+        </div>
+      </section>
+
+      <!-- Slide 10: Human Evaluation -->
+      <section>
+        <h2>✅ Human Evaluation & Qualité</h2>
+        <p>Processus d'évaluation continue pour améliorer l'agent :</p>
+        
+        <div class="flow-diagram" style="flex-direction: column;">
+          <div style="display: flex; align-items: center; gap: 20px; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); width: 100%;">
+            <div style="flex: 1; background: #3498db; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+              <strong>1. Collecte</strong><br>
+              <small>Traces d'interactions</small>
+            </div>
+            <div style="font-size: 1.5em; color: #7f8c8d;">→</div>
+            <div style="flex: 1; background: #9b59b6; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+              <strong>2. Annotation</strong><br>
+              <small>Évaluation humaine</small>
+            </div>
+            <div style="font-size: 1.5em; color: #7f8c8d;">→</div>
+            <div style="flex: 1; background: #e74c3c; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+              <strong>3. Métriques</strong><br>
+              <small>Score de qualité</small>
+            </div>
+            <div style="font-size: 1.5em; color: #7f8c8d;">→</div>
+            <div style="flex: 1; background: #2ecc71; color: white; padding: 15px; border-radius: 8px; text-align: center;">
+              <strong>4. Amélioration</strong><br>
+              <small>Feedback loop</small>
+            </div>
+          </div>
+        </div>
+        
+        <div class="diagram-container" style="margin-top: 30px;">
+          <h4 style="margin-top: 0; color: #2c3e50;">📊 Critères d'Évaluation</h4>
+          <table class="comparison-table">
+            <tr>
+              <th>Critère</th>
+              <th>Description</th>
+              <th>Métrique</th>
+            </tr>
+            <tr>
+              <td><strong>Exactitude</strong></td>
+              <td>La réponse est-elle correcte ?</td>
+              <td>✓/✗ ou score 1-5</td>
+            </tr>
+            <tr>
+              <td><strong>Utilité</strong></td>
+              <td>Répond-elle au besoin utilisateur ?</td>
+              <td>Score 1-5</td>
+            </tr>
+            <tr>
+              <td><strong>Sécurité</strong></td>
+              <td>Aucun contenu dangereux/inapproprié</td>
+              <td>✓/✗</td>
+            </tr>
+            <tr>
+              <td><strong>Efficacité</strong></td>
+              <td>Nombre d'étapes/temps</td>
+              <td>Nombre d'itérations</td>
+            </tr>
+            <tr>
+              <td><strong>Clarté</strong></td>
+              <td>Explications compréhensibles</td>
+              <td>Score 1-5</td>
+            </tr>
+          </table>
+        </div>
+        
+        <div class="code-annotation">
+          <strong>📈 Bonnes pratiques :</strong> Échantillonnez 5-10% des interactions pour évaluation humaine. Utilisez l'inter-annotator agreement pour valider la qualité des annotations.
+        </div>
+      </section>
+
+      <!-- Slide 11: Complete Example -->
+      <section>
+        <h2>💻 Exemple Complet : Agent Support Client</h2>
+        <p>Cas d'usage : Gestion de réclamations avec validation humaine</p>
+        
+        <pre><code>from langchain.agents import AgentExecutor, create_react_agent
+from langchain.memory import ConversationBufferWindowMemory
+from langchain.tools import Tool
+from langchain.vectorstores import Chroma
+from langchain.embeddings import OpenAIEmbeddings
+
+# 1. Configuration Mémoire
+memory = ConversationBufferWindowMemory(
+    k=10,  # 10 derniers échanges
+    return_messages=True,
+    memory_key="chat_history"
+)
+
+# 2. Base de connaissances (RAG)
+embeddings = OpenAIEmbeddings()
+vectorstore = Chroma(
+    persist_directory="./docs",
+    embedding_function=embeddings
+)
+retriever = vectorstore.as_retriever(search_kwargs={"k": 3})
+
+# 3. Définition des Outils
+def check_order_status(order_id: str) -> str:
+    """Vérifie le statut d'une commande"""
+    # Appel API base de données
+    return db.query(f"SELECT status FROM orders WHERE id={order_id}")
+
+def process_refund(order_id: str, amount: float, reason: str) -> dict:
+    """Traite un remboursement (nécessite validation humaine si > 100€)"""
+    if amount > 100:
+        return {"status": "pending_approval", "requires_human": True}
+    return {"status": "processed", "transaction_id": generate_id()}
+
+def search_knowledge_base(query: str) -> str:
+    """Recherche dans la base de connaissances"""
+    docs = retriever.get_relevant_documents(query)
+    return "\n".join([d.page_content for d in docs])
+
+tools = [
+    Tool(
+        name="OrderStatus",
+        func=check_order_status,
+        description="Vérifie le statut d'une commande. Input: order_id"
+    ),
+    Tool(
+        name="ProcessRefund",
+        func=process_refund,
+        description="Traite un remboursement. Input: order_id, amount, reason"
+    ),
+    Tool(
+        name="KnowledgeBase",
+        func=search_knowledge_base,
+        description="Recherche des informations dans la documentation"
+    )
+]
+
+# 4. Prompt ReAct personnalisé
+REACT_PROMPT = """Tu es un assistant support client expert.
+Utilise le format ReAct suivant:
+
+Question: la question de l'utilisateur
+Thought: tu dois toujours réfléchir étape par étape
+Action: l'action à effectuer (parmi {tool_names})
+Action Input: les paramètres de l'action
+Observation: le résultat de l'action
+... (ce processus Thought/Action/Observation peut se répéter N fois)
+Thought: Je connais maintenant la réponse finale
+Final Answer: la réponse finale à l'utilisateur
+
+Si l'action nécessite une validation humaine (remboursement > 100€, 
+modification de données sensibles), indique-le clairement.
+
+Contexte: {context}
+Chat History: {chat_history}
+Question: {input}
+{agent_scratchpad}"""
+
+# 5. Création de l'agent
+agent = create_react_agent(llm, tools, prompt=REACT_PROMPT)
+agent_executor = AgentExecutor(
+    agent=agent,
+    tools=tools,
+    memory=memory,
+    verbose=True,
+    max_iterations=15,
+    handle_parsing_errors=True
+)
+
+# 6. Fonction d'exécution avec HITL
+def execute_with_hitl(user_input: str) -> str:
+    response = agent_executor.invoke({"input": user_input})
+    
+    # Vérification post-exécution
+    if "pending_approval" in str(response):
+        # Notification à l'équipe humaine
+        notify_human_team(response)
+        return "Votre demande a été transmise à notre équipe pour validation. Vous recevrez une réponse sous 24h."
+    
+    # Logging pour évaluation
+    log_interaction(user_input, response, metadata={
+        "timestamp": datetime.now(),
+        "memory_size": len(memory.buffer),
+        "tools_used": extract_tools_used(response)
+    })
+    
+    return response["output"]
+
+# 7. Exemple d'utilisation
+result = execute_with_hitl(
+    "Je veux retourner ma commande #12345 et être remboursé de 150€"
+)
+print(result)</code></pre>
+      </section>
+
+      <!-- Slide 12: Real-world Scenario -->
+      <section>
+        <h2>🎬 Scénario Temps Réel</h2>
+        <p>Exécution complète d'une requête complexe :</p>
+        
+        <div class="diagram-container" style="background: #fff; border-left: 5px solid #27ae60;">
+          <h4 style="margin-top: 0; color: #27ae60;">📞 Requête Utilisateur</h4>
+          <p style="background: #ecf0f1; padding: 15px; border-radius: 5px; font-style: italic;">
+            "Bonjour, j'ai reçu un produit défectueux (commande #78945). 
+            Je voudrais un remboursement et connaître votre politique de retour 
+            pour les produits électroniques."
+          </p>
+        </div>
+        
+        <div style="margin: 20px 0;">
+          <div style="background: #3498db; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>🤖 Thought 1:</strong> L'utilisateur demande un remboursement pour la commande #78945 et des infos sur la politique de retour. Je dois d'abord vérifier le statut de la commande.
+          </div>
+          
+          <div style="background: #2ecc71; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>🔧 Action 1:</strong> OrderStatus<br>
+            <strong>Action Input:</strong> {"order_id": "78945"}
+          </div>
+          
+          <div style="background: #95a5a6; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>👁️ Observation 1:</strong> {"status": "delivered", "date": "2024-01-15", "product": "Laptop Dell XPS 15", "amount": 1299.99, "within_return_window": true}
+          </div>
+          
+          <div style="background: #3498db; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>🤖 Thought 2:</strong> La commande est livrée depuis moins de 30 jours, donc éligible au retour. Le montant est de 1299.99€ (> 100€), donc nécessite validation humaine. Je dois aussi chercher la politique de retour.
+          </div>
+          
+          <div style="background: #2ecc71; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>🔧 Action 2:</strong> KnowledgeBase<br>
+            <strong>Action Input:</strong> "politique retour produits électroniques"
+          </div>
+          
+          <div style="background: #95a5a6; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>👁️ Observation 2:</strong> "Retour possible sous 30 jours. Produit doit être dans son emballage d'origine. Remboursement sous 5-10 jours ouvrés après réception."
+          </div>
+          
+          <div style="background: #e74c3c; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong> Action 3:</strong> ProcessRefund<br>
+            <strong>Action Input:</strong> {"order_id": "78945", "amount": 1299.99, "reason": "produit défectueux"}
+          </div>
+          
+          <div style="background: #95a5a6; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>👁️ Observation 3:</strong> {"status": "pending_approval", "requires_human": true, "ticket_id": "REF-2024-5678"}
+          </div>
+          
+          <div style="background: #9b59b6; color: white; padding: 10px 15px; border-radius: 5px; margin: 10px 0;">
+            <strong>🤖 Thought 3:</strong> Le remboursement nécessite une validation humaine car > 100€. J'ai créé le ticket REF-2024-5678. Je dois informer l'utilisateur et donner les instructions de retour.
+          </div>
+          
+          <div style="background: #27ae60; color: white; padding: 15px; border-radius: 5px; margin: 10px 0; font-weight: bold;">
+            <strong>✅ Final Answer:</strong><br>
+            "J'ai bien pris en compte votre demande pour la commande #78945 (Laptop Dell XPS 15).<br><br>
+            ✓ Votre commande est éligible au retour (moins de 30 jours)<br>
+            ✓ Un ticket de remboursement a été créé: <strong>REF-2024-5678</strong><br>
+            ⏳ Montant: 1299.99€ - Validation requise (délai: 24-48h)<br><br>
+            📦 <strong>Instructions de retour:</strong><br>
+            - Emballez le produit dans son emballage d'origine<br>
+            - Imprimez l'étiquette de retour (email envoyé)<br>
+            - Déposez le colis en point relais<br><br>
+            💰 Une fois validé par notre équipe, le remboursement sera effectif sous 5-10 jours ouvrés."
+          </div>
+        </div>
+        
+        <div class="code-annotation">
+          <strong>👤 Intervention humaine :</strong> L'équipe support reçoit une notification pour valider le remboursement de 1299.99€. Elle vérifie l'historique client et approuve sous 2h.
+        </div>
+      </section>
+
+      <!-- Slide 13: Best Practices -->
+      <section>
+        <h2>📋 Bonnes Pratiques & Pièges à Éviter</h2>
+        
+        <div class="arch-grid">
+          <div class="arch-box" style="border-color: #27ae60; background: #d5f4e6;">
+            <h4 style="color: #27ae60;">✅ À Faire</h4>
+            <ul style="font-size: 0.85em;">
+              <li><strong>Timeouts</strong> : Limitez à 10-15 itérations max</li>
+              <li><strong>Logging complet</strong> : Tracez chaque Thought/Action</li>
+              <li><strong>Gestion d'erreurs</strong> : Catch les exceptions d'outils</li>
+              <li><strong>Rate limiting</strong> : Évitez les appels API excessifs</li>
+              <li><strong>Validation input</strong> : Sanitize les entrées utilisateur</li>
+              <li><strong>Tests réguliers</strong> : Scénarios edge cases</li>
+              <li><strong>Documentation</strong> : Décrivez chaque outil précisément</li>
+            </ul>
+          </div>
+          <div class="arch-box" style="border-color: #e74c3c; background: #fadbd8;">
+            <h4 style="color: #c0392b;">❌ À Éviter</h4>
+            <ul style="font-size: 0.85em;">
+              <li><strong>Boucles infinies</strong> : L'agent qui tourne en rond</li>
+              <li><strong>Context overflow</strong> : Trop d'historique = coût + erreurs</li>
+              <li><strong>Outils redondants</strong> : Gardez une liste minimaliste</li>
+              <li><strong>Prompt trop long</strong> : Restez concis dans les instructions</li>
+              <li><strong>Ignorer la confidentialité</strong> : Ne loggez pas les données sensibles</li>
+              <li><strong>Sauter le HITL</strong> : Même si "ça marche" sans</li>
+              <li><strong>Pas de monitoring</strong> : Surveillez les métriques en prod</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div class="diagram-container" style="margin-top: 20px;">
+          <h4 style="margin-top: 0;">🔧 Checklist de Déploiement</h4>
+          <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; font-size: 0.9em;">
+            <div>☐ Tests unitaires sur chaque outil</div>
+            <div>☐ Tests d'intégration ReAct complet</div>
+            <div>☐ Configuration HITL opérationnelle</div>
+            <div>☐ Système de logging en place</div>
+            <div>☐ Dashboard de monitoring</div>
+            <div>☐ Procédure d'escalade définie</div>
+            <div>☐ Documentation utilisateur</div>
+            <div>☐ Plan de rollback</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 14: Interactive Quiz -->
+      <section>
+        <h2>🧪 Quiz de Validation</h2>
+        
+        <div class="quiz-container">
+          <p><strong>Question 1 :</strong> Dans quel cas activez-vous systématiquement le Human-in-the-Loop ?</p>
+          <button class="quiz-btn" data-correct="false">A. Quand l'agent met plus de 5 secondes à répondre</button>
+          <button class="quiz-btn" data-correct="true">B. Quand le montant d'une transaction dépasse 1000€</button>
+          <button class="quiz-btn" data-correct="false">C. Quand l'utilisateur pose une question simple</button>
+          <div class="feedback"></div>
+        </div>
+        
+        <div class="quiz-container">
+          <p><strong>Question 2 :</strong> Quelle est la différence entre mémoire court terme et long terme ?</p>
+          <button class="quiz-btn" data-correct="false">A. Aucune, c'est la même chose</button>
+          <button class="quiz-btn" data-correct="true">B. Court terme = conversation actuelle, Long terme = stockage vectoriel persistant</button>
+          <button class="quiz-btn" data-correct="false">C. Court terme = RAM, Long terme = disque dur</button>
+          <div class="feedback"></div>
+        </div>
+        
+        <div class="quiz-container">
+          <p><strong>Question 3 :</strong> Pourquoi utiliser le Chain of Thought (CoT) ?</p>
+          <button class="quiz-btn" data-correct="true">A. Pour rendre le raisonnement transparent et déboguable</button>
+          <button class="quiz-btn" data-correct="false">B. Pour aller plus vite</button>
+          <button class="quiz-btn" data-correct="false">C. Pour réduire la taille du prompt</button>
+          <div class="feedback"></div>
+        </div>
+        
+        <p style="margin-top: 20px; font-size: 0.9em; color: #7f8c8d;">
+          💡 Cliquez sur une réponse pour voir si elle est correcte
+        </p>
+      </section>
+
+      <!-- Slide 15: Conclusion -->
+      <section>
+        <h2>🎯 Conclusion & Ressources</h2>
+        
+        <div class="diagram-container" style="background: linear-gradient(135deg, #667eea 0%); color: white; border: none;">
+          <h3 style="color: white; margin-top: 0;">📦 Vous avez maintenant tous les éléments pour créer un Agent ReAct robuste :</h3>
+          <ul style="text-align: left; font-size: 0.95em;">
+            <li>✅ <strong>Chain of Thought</strong> pour un raisonnement structuré</li>
+            <li>✅ <strong>Mémoire hiérarchique</strong> (court + long terme)</li>
+            <li>✅ <strong>RAG</strong> pour un contexte enrichi et à jour</li>
+            <li>✅ <strong>Système d'outils</strong> extensible</li>
+            <li>✅ <strong>Human-in-the-Loop</strong> pour les cas critiques</li>
+            <li>✅ <strong>Évaluation humaine</strong> continue</li>
+          </ul>
+        </div>
+        
+        <div class="arch-grid" style="margin-top: 30px;">
+          <div class="arch-box">
+            <h4>📚 Ressources Recommandées</h4>
+            <ul style="font-size: 0.85em;">
+              <li><strong>ReAct Paper</strong> (Yao et al., 2023)</li>
+              <li><strong>LangChain Docs</strong> : Agents & Memory</li>
+              <li><strong>LlamaIndex</strong> : RAG avancé</li>
+              <li><strong>HumanLoop</strong> : Plateforme HITL</li>
+            </ul>
+          </div>
+          <div class="arch-box">
+            <h4>🚀 Prochaines Étapes</h4>
+            <ul style="font-size: 0.85em;">
+              <li>Implémenter un POC simple</li>
+              <li>Ajouter le logging (LangSmith)</li>
+              <li>Configurer le HITL</li>
+              <li>Mettre en place l'évaluation</li>
+              <li>Itérer et améliorer</li>
+            </ul>
+          </div>
+        </div>
+        
+        <div style="margin-top: 40px; padding: 30px; background: #ecf0f1; border-radius: 10px; text-align: center;">
+          <h3 style="margin-top: 0; color: #2c3e50;"></h3>
+          <p style="color: #7f8c8d;">
+            Enregistrez-la et ouvrez-la dans n'importe quel navigateur.<br>
+          </p>
+          <p style="margin-top: 5px; font-size: 0.9em; color: #95a5a6;">
+            💡 Astuce: Utilisez Ctrl+S pour sauvegarder cette page HTML
+          </p>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      controls: true,
+      progress: true,
+      center: true,
+      hash: true,
+      transition: 'convex', // none/fade/slide/convex/concave/zoom
+      slideNumber: false, // Pas de numérotation visible
+      showSlideNumber: false,
+      controlsTutorial: true,
+      controlsLayout: 'edges'
+    });
+
+    // Toggle hidden content
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const target = document.querySelector(this.dataset.target);
+        if (target.style.display === 'block') {
+          target.style.display = 'none';
+          this.textContent = this.textContent.replace('Masquer', 'Révéler');
+        } else {
+          target.style.display = 'block';
+          this.textContent = this.textContent.replace('Révéler', 'Masquer');
+        }
+      });
+    });
+
+    // Quiz interaction
+    document.querySelectorAll('.quiz-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const isCorrect = this.dataset.correct === 'true';
+        const feedback = this.closest('.quiz-container').querySelector('.feedback');
+        feedback.className = 'feedback show ' + (isCorrect ? 'correct' : 'incorrect');
+        feedback.textContent = isCorrect 
+          ? '✅ Exact ! ' + (this.textContent.includes('1000€') ? 'Les transactions importantes nécessitent toujours une validation humaine pour des raisons de sécurité.' : this.textContent.includes('conversation') ? 'Le court terme garde le contexte immédiat, le long terme stocke de façon persistante dans une base vectorielle.' : 'Le CoT permet de voir le raisonnement, de déboguer, et réduit les erreurs de logique.')
+          : '❌ Pas tout à fait. Relisez les slides précédentes pour mieux comprendre.';
+        
+        // Disable other buttons after choice
+        this.closest('.quiz-container').querySelectorAll('.quiz-btn').forEach(b => b.disabled = true);
+        this.style.background = isCorrect ? '#27ae60' : '#e74c3c';
+        this.style.color = 'white';
+      });
+    });
+
+    // Auto-resize for mobile
+    window.addEventListener('resize', function() {
+      Reveal.layout();
+    });
+  </script>
+</body>
+</html>
