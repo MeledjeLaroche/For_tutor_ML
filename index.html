@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tutoriel Complet : Agent ReAct avec Mémoire & Human-in-the-Loop</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/theme/white.css">
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-dark: #1d4ed8;
+      --success: #16a34a;
+      --warning: #ca8a04;
+      --danger: #dc2626;
+      --purple: #7c3aed;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-600: #4b5563;
+      --gray-800: #1f2937;
+    }
+    html, body { margin: 0; padding: 0; overflow: hidden; height: 100%; }
+    .reveal { font-size: 18px; color: #374151; }
+    .reveal h1 { font-size: 2.2em; color: var(--gray-800); margin-bottom: 0.3em; }
+    .reveal h2 { font-size: 1.6em; color: var(--gray-800); margin: 0 0 20px 0; }
+    .reveal h3 { font-size: 1.2em; color: var(--gray-600); margin-top: 0; }
+    .reveal p, .reveal li { line-height: 1.5; margin: 0.4em 0; font-size: 0.95em; }
+    .reveal pre { background: #111827; padding: 12px 15px; border-radius: 6px; font-size: 0.8em; margin: 10px 0; overflow: hidden; }
+    .reveal code { font-family: 'Consolas', monospace; color: #60a5fa; }
+    .reveal strong { color: var(--gray-800); }
+    .reveal ul { margin-left: 20px; padding-left: 0; }
+    .reveal li { margin-bottom: 6px; }
+
+    /* Layout containers */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin: 15px 0; }
+    .card { background: white; border: 1px solid var(--gray-200); padding: 15px; border-radius: 8px; box-shadow: 0 2px 6px rgba(0,0,0,0.08); }
+    .card h4 { margin: 0 0 10px 0; padding-bottom: 8px; border-bottom: 2px solid var(--primary); color: var(--gray-800); }
+    
+    /* Flow & Diagrams */
+    .flow { display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap; margin: 15px 0; }
+    .box { background: var(--gray-100); padding: 10px 15px; border-radius: 6px; text-align: center; min-width: 110px; border: 2px solid var(--gray-200); font-size: 0.9em; }
+    .box.p { background: #dbeafe; border-color: var(--primary); color: var(--primary-dark); }
+    .box.s { background: #dcfce7; border-color: var(--success); color: #15803d; }
+    .box.d { background: #fef3c7; border-color: var(--warning); color: #854d0e; }
+    .box.i { background: #ede9fe; border-color: var(--purple); color: #5b21b6; }
+    .arrow { font-size: 1.5em; color: #9ca3af; }
+
+    /* Memory stack */
+    .mem-stack { display: flex; flex-direction: column; gap: 8px; max-width: 420px; margin: 15px auto; }
+    .mem-layer { padding: 12px; border-radius: 6px; color: white; text-align: center; font-size: 0.85em; }
+    .mem-short { background: linear-gradient(90deg, #f472b6, #db2777); }
+    .mem-long { background: linear-gradient(90deg, #3b82f6, #1d4ed8); }
+
+    /* HITL diagram */
+    .hitl { display: flex; align-items: center; justify-content: space-around; gap: 10px; margin: 15px 0; }
+    .hitl-node { text-align: center; padding: 12px; border-radius: 8px; flex: 1; font-size: 0.85em; }
+    .hitl-ai { background: #eff6ff; border: 2px solid #3b82f6; }
+    .hitl-human { background: #fff7ed; border: 2px solid #f97316; }
+    .hitl-check { background: #f0fdf4; border: 2px solid #22c55e; }
+
+    /* Toggle & Quiz */
+    .toggle-btn { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 5px; cursor: pointer; font-size: 0.85em; margin: 10px 0; transition: 0.2s; }
+    .toggle-btn:hover { background: var(--primary-dark); }
+    .hidden-content { display: none; background: var(--gray-100); padding: 12px; border-radius: 6px; border-left: 4px solid var(--primary); font-size: 0.9em; margin-top: 8px; }
+    .quiz-box { background: var(--gray-100); padding: 15px; border-radius: 8px; margin: 12px 0; }
+    .q-btn { background: white; border: 2px solid var(--gray-200); padding: 10px; margin: 6px 0; width: 100%; text-align: left; border-radius: 5px; cursor: pointer; font-size: 0.9em; }
+    .q-btn:hover { background: #eff6ff; border-color: var(--primary); }
+    .q-feed { margin-top: 10px; padding: 8px; border-radius: 5px; font-size: 0.85em; display: none; }
+    .q-feed.show { display: block; }
+    .q-feed.ok { background: #dcfce7; color: #166534; }
+    .q-feed.no { background: #fee2e2; color: #991b1b; }
+
+    .note { background: #fef9c3; border-left: 4px solid #eab308; padding: 8px 12px; font-size: 0.85em; margin: 10px 0; border-radius: 4px; }
+    .table-wrap { overflow-x: auto; margin: 10px 0; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85em; }
+    th, td { border: 1px solid var(--gray-200); padding: 8px; text-align: left; }
+    th { background: var(--gray-100); color: var(--gray-800); }
+    
+    /* Force reveal scaling */
+    .reveal .slides { position: absolute; width: 100%; height: 100%; }
+    .reveal section { height: 100%; padding: 40px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: center; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- 1 -->
+      <section>
+        <h1>Creation d'agent ReAct</h1>
+        <h3>Mémoire • Contexte RAG • Human-in-the-Loop • Évaluation</h3>
+        <p style="margin-top: 30px; color: var(--gray-600); font-size: 0.9em;">Auteur: Mélèdje Laroche •</p>
+        <p style="margin: 10px 0 0 0; color: #95a5a6; font-size: 0.8em;">Navigation: ← → ou Espace</p>
+      </section>
+
+      <!-- 2 -->
+      <section>
+        <h2>🧠 Le Paradigme ReAct</h2>
+        <p><strong>Reason + Act</strong> : L'IA alterne réflexion structurée et action externe pour résoudre des tâches complexes.</p>
+        <div class="flow">
+          <div class="box p">💭 Thought<br><small>Raisonnement</small></div>
+          <div class="arrow">→</div>
+          <div class="box s">🔧 Action<br><small>Appel outil</small></div>
+          <div class="arrow">→</div>
+          <div class="box i">👁️ Observation<br><small>Résultat</small></div>
+          <div class="arrow">↻</div>
+        </div>
+        <button class="toggle-btn" data-t="#why-react">💡 Pourquoi ReAct ?</button>
+        <div id="why-react" class="hidden-content">
+          <ul><li>Transparence totale du raisonnement</li><li>Correction d'erreurs en temps réel</li><li>Accès sécurisé aux outils externes</li><li>Réduction drastique des hallucinations</li></ul>
+        </div>
+      </section>
+
+      <!-- 3 -->
+      <section>
+        <h2>🏗️ Architecture Complète</h2>
+        <div class="grid-2">
+          <div class="card">
+            <h4>🧠 Cerveau (LLM + CoT)</h4>
+            <ul><li>Décomposition étape par étape</li><li>Évaluation de confiance</li><li>Génération structurée</li></ul>
+          </div>
+          <div class="card">
+            <h4>📚 Mémoire Hybride</h4>
+            <ul><li>Court terme : conversation</li><li>Long terme : base vectorielle</li><li>Historique d'actions</li></ul>
+          </div>
+          <div class="card">
+            <h4>🔍 Contexte (RAG)</h4>
+            <ul><li>Documents à jour</li><li>Embeddings sémantiques</li><li>Top-K chunks pertinents</li></ul>
+          </div>
+          <div class="card">
+            <h4>👤 HITL & Évaluation</h4>
+            <ul><li>Validation humaine critique</li><li>Métriques de qualité</li><li>Feedback loop continu</li></ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4 -->
+      <section>
+        <h2>🔗 Chain of Thought (CoT)</h2>
+        <p>Force le modèle à expliciter sa logique avant d'agir.</p>
+        <pre><code>Q: "Meilleur resto italien >4.5★ acceptant CB ?"
+T1: Je dois localiser l'utilisateur
+A: get_location()
+O: "Paris 11"
+T2: Je cherche les restos italiens proches
+A: search_restaurants(loc="Paris 11", cuisine="it")
+O: [5 résultats]
+T3: Filtrage par note & paiement
+Final Answer: "Luigi's, 4.7★, 123 rue de la Roquette"</code></pre>
+        <div class="note">💡 Ajoutez "Pense étape par étape" dans le prompt pour activer le CoT automatiquement.</div>
+      </section>
+
+      <!-- 5 -->
+      <section>
+        <h2>🧠 Système de Mémoire</h2>
+        <div class="mem-stack">
+          <div class="mem-layer mem-short">📝 Court Terme<br><small>Contexte conversation • 10-20 messages • Variables temporaires</small></div>
+          <div class="mem-layer mem-long">🗄️ Long Terme<br><small>Vector DB (Chroma/FAISS) • Faits persistants • Historique tâches</small></div>
+        </div>
+        <div class="flow">
+          <div class="box d">📝 Écriture</div>
+          <div class="arrow">↔️</div>
+          <div class="box p">🔄 Mémoire Active</div>
+          <div class="arrow">↔️</div>
+          <div class="box s">🔍 Lecture Sémantique</div>
+        </div>
+        <button class="toggle-btn" data-t="#mem-code">💻 Implémentation concise</button>
+        <div id="mem-code" class="hidden-content">
+          <pre><code>short = ConversationBufferMemory(k=15, return_messages=True)
+long  = VectorStoreRetrieverMemory(retriever=chroma.as_retriever(k=5))
+ctx   = short.load_memory_variables({})
+facts = long.load_memory_variables({"query": user_input})</code></pre>
+        </div>
+      </section>
+
+      <!-- 6 -->
+      <section>
+        <h2>📚 RAG & Contexte</h2>
+        <div class="flow">
+          <div class="box">📄 Docs</div><div class="arrow">→</div>
+          <div class="box p">🔢 Embed</div><div class="arrow">→</div>
+          <div class="box s">🗄️ Vector DB</div><div class="arrow">→</div>
+          <div class="box d">🎯 Top-K</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Méthode</th><th>Usage</th><th>Avantage</th></tr>
+            <tr><td>Sparse (BM25)</td><td>Mots-clés exacts</td><td>Rapide & précis</td></tr>
+            <tr><td>Dense (Embeddings)</td><td>Sémantique</td><td>Comprend le sens</td></tr>
+            <tr><td>Hybride</td><td>Combinaison</td><td>Optimal ⭐</td></tr>
+          </table>
+        </div>
+        <div class="note">💡 Utilisez un <code>ParentDocumentRetriever</code> pour garder le contexte long tout en cherchant sur des chunks courts.</div>
+      </section>
+
+      <!-- 7 -->
+      <section>
+        <h2>🛠️ Outils & Actions</h2>
+        <div class="grid-2">
+          <div class="card"><h4>🔍 Recherche</h4><ul><li>Web, Base interne, API métier</li></ul></div>
+          <div class="card"><h4>🧮 Calcul</h4><ul><li>Python REPL, Maths, Data</li></ul></div>
+          <div class="card"><h4>📡 Action</h4><ul><li>Email, Ticket, MAJ BDD</li></ul></div>
+          <div class="card"><h4>👤 Utilisateur</h4><ul><li>Clarification, Confirmation</li></ul></div>
+        </div>
+        <div class="note">⚠️ Chaque outil doit avoir une <code>description</code> claire et des <code>paramètres</code> typés pour que le LLM sache quand l'appeler.</div>
+      </section>
+
+      <!-- 8 -->
+      <section>
+        <h2>🔄 Cycle ReAct Complet</h2>
+        <div class="flow" style="flex-direction: column; gap: 8px;">
+          <div class="box p" style="width: 80%;">1️⃣ Question + Récupération Contexte (RAG)</div>
+          <div class="arrow">⬇️</div>
+          <div class="box s" style="width: 80%;">2️⃣ Thought (CoT) → Choix Action + Mémoire</div>
+          <div class="arrow">⬇️</div>
+          <div class="box d" style="width: 80%;">3️⃣ HITL Check (si risque/confiance basse) → Exécution</div>
+          <div class="arrow">⬇️</div>
+          <div class="box i" style="width: 80%;">4️⃣ Observation → Update Mémoire → Réponse Finale ou Itération</div>
+        </div>
+        <pre><code>for i in range(MAX_ITER):
+    thought, action = llm(prompt)
+    if needs_approval(action):
+        if not human_approve(action): continue
+    obs = run_tool(action)
+    memory.add(thought, obs)
+    if is_final(thought): return finalize(thought)</code></pre>
+      </section>
+
+      <!-- 9 -->
+      <section>
+        <h2>👤 Human-in-the-Loop (HITL)</h2>
+        <div class="hitl">
+          <div class="hitl-node hitl-ai">🤖 Agent<br><small>Propose action</small></div>
+          <div class="arrow">→</div>
+          <div class="hitl-node hitl-check">⚖️ Décision<br><small>Seuil risque ?</small></div>
+          <div class="arrow">→</div>
+          <div class="hitl-node hitl-human">👤 Humain<br><small>Valide/Corrige</small></div>
+        </div>
+        <div class="grid-2" style="margin-top: 10px;">
+          <div class="card"><h4>🚦 Quand activer ?</h4><ul><li>Confiance < 0.7</li><li>Actions irréversibles</li><li>Données sensibles</li><li>Cas jamais vus</li></ul></div>
+          <div class="card"><h4>💡 Modes</h4><ul><li>Approval binaire</li><li>Correction directe</li><li>Guidance textuelle</li><li>Escalade expert</li></ul></div>
+        </div>
+      </section>
+
+      <!-- 10 -->
+      <section>
+        <h2>✅ Évaluation Humaine</h2>
+        <div class="flow">
+          <div class="box p">1. Collecte Traces</div><div class="arrow">→</div>
+          <div class="box i">2. Annotation</div><div class="arrow">→</div>
+          <div class="box d">3. Métriques</div><div class="arrow">→</div>
+          <div class="box s">4. Feedback Loop</div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <tr><th>Critère</th><th>Description</th><th>Métrique</th></tr>
+            <tr><td>Exactitude</td><td>Réponse correcte ?</td><td>✓/✗ ou 1-5</td></tr>
+            <tr><td>Utilité</td><td>Répond au besoin ?</td><td>Score 1-5</td></tr>
+            <tr><td>Sécurité</td><td>Contenu sûr ?</td><td>✓/✗</td></tr>
+            <tr><td>Efficacité</td><td>Nombre d'étapes</td><td>Itérations</td></tr>
+          </table>
+        </div>
+        <div class="note">📈 Échantillonnez 5-10% des interactions. Calculez l'accord inter-annotateurs pour valider la qualité.</div>
+      </section>
+
+      <!-- 11 -->
+      <section>
+        <h2>🎬 Scénario Réel</h2>
+        <p><strong>📞 Utilisateur :</strong> <em>"Retour produit défectueux #78945, remboursement 1299€. Politique retour électronique ?"</em></p>
+        <div style="background: var(--gray-100); padding: 12px; border-radius: 6px; font-size: 0.85em; line-height: 1.6;">
+          <strong>🤖 T1:</strong> Vérif commande → <strong>🔧 OrderStatus</strong> → <em>✅ Éligible retour, >100€</em><br>
+          <strong>🤖 T2:</strong> Recherche politique → <strong>🔧 KnowledgeBase</strong> → <em>📦 30j, emballage d'origine</em><br>
+          <strong>🤖 T3:</strong> Traitement → <strong>🔧 ProcessRefund</strong> → <em>⏳ En attente validation humaine</em><br>
+          <strong>✅ Réponse:</strong> Ticket créé <code>REF-5678</code>. Instructions retour envoyées. Validation sous 24-48h.
+        </div>
+        <div class="note">👤 L'équipe support reçoit une notification, vérifie l'historique et approuve sous 2h. Tout est logué pour évaluation.</div>
+      </section>
+
+      <!-- 12 -->
+      <section>
+        <h2>📋 Bonnes Pratiques</h2>
+        <div class="grid-2">
+          <div class="card" style="border-left: 4px solid var(--success);">
+            <h4 style="color: var(--success); border: none; padding: 0; margin: 0 0 8px 0;">✅ À Faire</h4>
+            <ul><li>Timeouts & max itérations</li><li>Logging complet ReAct</li><li>Gestion d'erreurs outils</li><li>Validation inputs</li><li>Monitoring prod</li></ul>
+          </div>
+          <div class="card" style="border-left: 4px solid var(--danger);">
+            <h4 style="color: var(--danger); border: none; padding: 0; margin: 0 0 8px 0;">❌ À Éviter</h4>
+            <ul><li>Boucles infinies</li><li>Context overflow</li><li>Outils redondants</li><li>Ignorer confidentialité</li><li>Sauter le HITL critique</li></ul>
+          </div>
+        </div>
+        <div class="note">🔧 Checklist: Tests unitaires outils • Tests intégration • HITL config • Logging • Dashboard • Rollback plan</div>
+      </section>
+
+      <!-- 13 -->
+      <section>
+        <h2>🧪 Quiz de Validation</h2>
+        <div class="quiz-box">
+          <p><strong>1.</strong> Quand activer systématiquement le HITL ?</p>
+          <button class="q-btn" data-ok="false">A. >5s de réponse</button>
+          <button class="q-btn" data-ok="true">B. Transaction >1000€</button>
+          <button class="q-btn" data-ok="false">C. Question simple</button>
+          <div class="q-feed"></div>
+        </div>
+        <div class="quiz-box">
+          <p><strong>2.</strong> Différence mémoire court/long terme ?</p>
+          <button class="q-btn" data-ok="false">A. Aucune</button>
+          <button class="q-btn" data-ok="true">B. Court=conv actuelle, Long=vectoriel persistant</button>
+          <button class="q-btn" data-ok="false">C. RAM vs Disque</button>
+          <div class="q-feed"></div>
+        </div>
+        <p style="font-size: 0.85em; color: var(--gray-600); margin-top: 10px;">💡 Cliquez pour vérifier. Réponses immédiates avec explications.</p>
+      </section>
+
+      <!-- 14 -->
+      <section>
+        <h2>🎯 Conclusion & Ressources</h2>
+        <div class="card" style="background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%); color: white; border: none;">
+          <h4 style="color: white; border-color: white; margin: 0 0 10px 0;">📦 Vous maîtrisez l'architecture :</h4>
+          <div class="grid-2" style="gap: 8px; margin-top: 8px;">
+            <ul style="margin: 0;"><li>✅ CoT structuré</li><li>✅ Mémoire hybride</li><li>✅ RAG contextuel</li></ul>
+            <ul style="margin: 0;"><li>✅ Outils modulaires</li><li>✅ HITL sécurisé</li><li>✅ Évaluation continue</li></ul>
+          </div>
+        </div>
+        <div class="grid-2" style="margin-top: 15px;">
+          <div class="card"><h4>📚 Docs</h4><ul><li>ReAct Paper (Yao et al.)</li><li>LangChain Agents/Memory</li><li>LlamaIndex RAG</li></ul></div>
+          <div class="card"><h4>🚀 Prochaines étapes</h4><ul><li>POC simple</li><li>Logging (LangSmith)</li><li>Config HITL</li><li>Évaluation itérative</li></ul></div>
+        </div>
+        <p style="text-align: center; margin-top: 20px; font-size: 0.85em; color: var(--gray-600);">📥Liens utiles: https://reference.langchain.com/python/langchain/agents </p>
+<p style="text-align: center; margin-top: 20px; font-size: 0.85em; color: var(--gray-600);">📥https://github.com/NirDiamant/GenAI_Agents </p>
+
+      </section>
+
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/reveal.js@4.6.1/dist/reveal.js"></script>
+  <script>
+    Reveal.initialize({
+      width: 1200,
+      height: 700,
+      margin: 0.05,
+      minScale: 0.2,
+      maxScale: 1.5,
+      center: true,
+      transition: 'slide',
+      slideNumber: false,
+      view: 'normal'
+    });
+
+    // Toggles
+    document.querySelectorAll('.toggle-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const t = document.querySelector(this.dataset.t);
+        t.style.display = t.style.display === 'block' ? 'none' : 'block';
+        this.textContent = t.style.display === 'block' ? '🔼 Masquer' : '🔽 Révéler';
+      });
+    });
+
+    // Quiz
+    document.querySelectorAll('.q-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const isOk = this.dataset.ok === 'true';
+        const feed = this.closest('.quiz-box').querySelector('.q-feed');
+        feed.className = 'q-feed show ' + (isOk ? 'ok' : 'no');
+        feed.textContent = isOk ? '✅ Correct ! ' + (this.textContent.includes('1000€') ? 'Les montants élevés exigent une validation humaine de sécurité.' : 'Le court terme garde le contexte immédiat, le long terme persiste dans une base vectorielle.') : '❌ Relisez les slides précédentes pour clarifier.';
+        this.closest('.quiz-box').querySelectorAll('.q-btn').forEach(b => b.disabled = true);
+        this.style.background = isOk ? '#22c55e' : '#ef4444';
+        this.style.color = 'white';
+      });
+    });
+  </script>
+</body>
+</html>
